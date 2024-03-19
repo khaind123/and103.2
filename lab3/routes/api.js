@@ -1,0 +1,144 @@
+var express = require('express');
+var router = express.Router();
+
+//Thêm model
+const Distributors = require('../models/distributors');
+const Fruits = require('../models/fruits');
+const { route } = require('.');
+
+//Api thêm distributor
+router.post('/add-distributor', async (req, res) => {
+    try {
+        const data = req.body;//Lấy dữ liệu từ body
+        const newDistributors = new Distributors({
+            name: data.name
+        });//Tạo một đối tượng mới
+        const result = await newDistributors.save();//Thêm vào database
+        
+        if (result) {
+            //Nếu thêm thành công result !null trả về dữ liệu
+            res.json({
+                "status" : 200,
+                "messenger" : "Thêm thành công.",
+                "data" : result
+            })
+        } else {
+            //Nếu thêm thất bại result null, thông báo thất bại
+            res.json({
+                "status" : 400,
+                "messenger" : "Lỗi, thêm thất bại.",
+                "data" : []
+            })
+        }
+    } catch (error) {
+        console.log(error);
+    }
+})
+
+//Api thêm fruit
+router.post('/add-fruit', async (req, res) => {
+    try {
+        const data = req.body;//Lấy dữ liệu từ body
+        const newFruits = new Fruits({
+            name: data.name,
+            quantity: data.quantity,
+            price: data.price,
+            status: data.status,
+            image: data.image,
+            description: data.description,
+            id_distributor: data.id_distributor
+        });//Tạo một đối tượng mới
+        const result = await newFruits.save();//Thêm vào database
+        
+        if (result) {
+            //Nếu thêm thành công result !null trả về dữ liệu
+            res.json({
+                "status" : 200,
+                "messenger" : "Thêm thành công.",
+                "data" : result 
+            })
+        } else {
+            //Nếu thêm thất bại result null, thông báo thất bại
+            res.json({
+                "status" : 400,
+                "messenger" : "Lỗi, thêm thất bại.",
+                "data" : []
+            })
+        }
+    } catch (error) {
+        console.log(error);
+    }
+})
+
+//Get fruit
+router.get('/get-list-fruit', async (req, res) => {
+    try {
+        const data = await Fruits.find().populate('id_distributor');
+        res.json({
+            "status" : 200,
+            "messenger" : "Danh sách fruit",
+            "data" : data
+        })
+    } catch (error) {
+        
+    }
+})
+
+//Get chi tiết fruit
+router.get('/get-list-fruit/:id', async (req, res) => {
+    //:id param
+    try {
+        const {id} = req.params //Lấy dữ liệu thông qua :id trên url gọi là param
+        const data = await Fruits.findById(id).populate('id_distributor');
+        res.json({
+            "status" : 200,
+            "messenger" : "Danh sách fruit",
+            "data" : data
+        })
+    } catch (error) {
+        
+    }
+})
+
+//Api cập nhật fruit
+// route.put('/update-fruit-by-id/:id', async(req, res) => {
+//     try {
+//         const {id} = req.params;
+//         const data = req.body//Lấy dữ liệu từ body
+//         const updateFruit = await Fruits.findById(id);
+//         let result = null;
+
+//         if (updateFruit) {
+//             updateFruit.name = data.name ?? updateFruit.name,
+//             updateFruit.quantity = data.quantity ?? updateFruit.quantity,
+//             updateFruit.price = data.price ?? updateFruit.price,
+//             updateFruit.status = data.status ?? updateFruit.status,
+//             updateFruit.image = data.image ?? updateFruit.image,
+//             updateFruit.description = data.description ?? updateFruit.description,
+//             updateFruit.id_distributor = data.id_distributor ?? updateFruit.id_distributor,
+//             result = await updateFruit.save();
+//         }
+
+//         //Tạo một đối tượng mới
+//         //Thêm vào database
+//         if (result) {
+//             //Nếu cập nhật thành công result !null trả về dữ liệu
+//             res.json({
+//                 "status" : 200,
+//                 "messenger" : "Cập nhật thành công.",
+//                 "data" : result
+//             })
+//         } else {
+//             //Nếu cập nhật thất bại result null, thông báo thất bại
+//             res.json({
+//                 "status" : 400,
+//                 "messenger" : "Lỗi, cập nhật thất bại.",
+//                 "data" : []
+//             })
+//         }
+//     } catch (error) {
+//         console.log(error);
+//     }
+// })
+
+module.exports = router;
