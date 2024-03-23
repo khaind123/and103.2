@@ -2,16 +2,21 @@ var express = require('express');
 var router = express.Router();
 
 //Thêm model
-const modelFruits = require('../models/fruits');
-const modelDistributors = require('../models/distributors');
+const Fruits = require('../models/fruits');
+const Distributors = require('../models/distributors');
+const Users = require('../models/users');
+const Upload = require('../config/common/upload');
+const Transporter = require('../config/common/mail');
 const { route } = require('.');
 
 //Api thêm distributor
-router.post('/add-fruit', async (req, res) => {
+router.post('/add-distributor', async (req, res) => {
     try {
-        const model = new modelDistributors(req.body);//Lấy dữ liệu từ body
-        const result = await model.save();
-        res.send(result);
+        const data = req.body;//Lấy dữ liệu từ body
+        const newDistributors = new Distributors({
+            name: data.name
+        });
+        const result = await newDistributors.save();
             
         if (result) {
             //Nếu thêm thành công result !null trả về dữ liệu
@@ -36,9 +41,17 @@ router.post('/add-fruit', async (req, res) => {
 //Api thêm fruit
 router.post('/add-fruit', async (req, res) => {
     try {
-        const model = new modelFruits(req.body);//Lấy dữ liệu từ body
-        const result = await model.save();
-        res.send(result);
+        const data = req.body; //Lấy dữ liệu từ body
+        const newfruit = new Fruits({
+            name: data.name,
+            quantity: data.quantity,
+            price: data.price,
+            status: data.status,
+            image: data.image,
+            description: data.description,
+            id_distributor: data.id_distributor
+        });
+        const result = await newfruit.save();
             
         if (result) {
             //Nếu thêm thành công result !null trả về dữ liệu
@@ -62,9 +75,8 @@ router.post('/add-fruit', async (req, res) => {
 
 //Get fruit
 router.get('/get-list-fruit', async (req, res) => {
-    const result = await modelFruits.find({});
-
     try {
+        const data = await Fruits.find().populate('id_distributor');
         res.json({
             "status" : 200,
             "messenger" : "Danh sách fruit",
@@ -76,58 +88,65 @@ router.get('/get-list-fruit', async (req, res) => {
 })
 
 //Get chi tiết fruit
-router.get('/get-list-fruit/:id', async (req, res) => {
+router.get('/get-fruit-by-id/:id', async (req, res) => {
     //:id param
-    const result = await modelFruits.findById(req.params.id)
-    
     try {
-        if (result) {
-            res.send(result);
-        } else {
-            res.json({
-                "status": 400,
-                "message": "Không tìm thấy id",
-                "data": []
-            })
-        }
+        const {id} = req.params;
+        const data = await Fruits.findById(id).populate('id_distributor');
+
+        res.json({
+            "status": 200,
+            "message": "Danh sách fruit",
+            "data": data
+        })
     } catch (error) {
-        if (error.name === "CastError") {
-            res.status(404).send('Invalid id format');
-        } else {
-            console.log(error);
-            res.status(500).send('Internal server error');
-        }
+        console.log(error);
     }
 })
 
 //Api cập nhật fruit
-router.patch('/update-fruit-by-id/:id', async(req, res) => {
+router.put('/update-fruit-by-id/:id', async(req, res) => {
     try {
-        const result = await modelFruits.findByIdAndUpdate(req.params.id, req.body);
+        const {id} = req.params;
+        const data = req.body;
+        const updatefruit = await Fruits.findById(id);
+        let result = null;
+
+        if (updatefruit) {
+            updatefruit.name = data.name ?? updatefruit.name;
+            updatefruit.quantity = data.quantity ?? updatefruit.quantity;
+            updatefruit.price = data.price ?? updatefruit.price;
+            updatefruit.status = data.status ?? updatefruit.status;
+            updatefruit.image = data.image ?? updatefruit.image;
+            updatefruit.description = data.description ?? updatefruit.description;
+            updatefruit.id_distributor = data.id_distributor ?? updatefruit.id_distributor;
+            result = await updatefruit.save();
+        }
+
         if (result) {
-            const rs = await result.save();
-            res.send(rs);
-        } else {
+            res.json({
+                "status": 200,
+                "message": "Cập nhật thành công",
+                "data": result
+            })
+        }else {
             res.json({
                 "status": 400,
-                "message": "Không tìm thấy id",
+                "message": "Lỗi, cập nhật thất bại",
                 "data": []
             })
         }
     } catch (error) {
-        if (error.name === "CastError") {
-            res.status(404).send('Invalid id format');
-        } else {
-            console.log(error);
-            res.status(500).send('Internal server error');
-        }
+        console.log(error);
     }
 })
 
-//Xóa cập nhật fruit
+//Xóa fruit
 router.delete('/delete/:id', async(req, res) => {
     try {
-        const result = await modelFruits.findByIdAndDelete(req.params.id);
+        const {id} = req.params;
+        const result = await Fruits.findByIdAndDelete(id);
+
         if (result) {
             res.json({
                 "status": 200,
@@ -142,12 +161,83 @@ router.delete('/delete/:id', async(req, res) => {
             })
         }
     } catch (error) {
-        if (error.name === "CastError") {
-            res.status(404).send('Invalid id format');
+        console.log(error);
+    }
+})
+
+//Thêm ảnh
+router.post('/add-fruit-with-file-image', Upload.array('image', 5), async(req, res) => {
+    //Upload.array('image', 5) => upload nhiều file, tối đa là 5
+    //Upload.single(image) => upload 1 file
+
+    try {
+        const data = req.body;
+        const {files} = req;
+        const urlsImage = files.map((file) => `${req.protocol}://${req.get("host")}/uploads/${file.filename}`)
+        //url hình ảnh được lưu dưới dạng: http://localhost:3000/upload/filename
+
+        const newfruit = new fruits({
+            name: data.name,
+            quantity: data.quantity,
+            price: data.price,
+            status: data.status,
+            image: urlsImage,
+            description: data.description,
+            id_distributor: data.id_distributor
+        });
+        const result = await newfruit.save();
+
+        if (result) {
+            res.json({
+                "status": 200,
+                "message": "Thêm thành công",
+                "data": result
+            });
         } else {
-            console.log(error);
-            res.status(500).send('Internal server error');
+            res.json({
+                "status": 404,
+                "message": "Lỗi, thêm thất bại",
+                "data": []
+            })
         }
+    } catch (error) {
+        console.log(error);
+    }
+})
+
+//Gửi email đăng ký
+router.post('/register-send-email',Upload.single('avatar'),async(req,res) =>{
+    try {
+        const data = req.body;
+        const newUser = Users({
+            username: data.username, 
+            password : data.password,
+            email: data.email, 
+            name: data.name,
+        })
+        const result = await newUser.save()
+
+        if(result) { //Gửi mail
+            const mailOptions = {
+                from: "khaindpd08774@fpt.edu.vn", //email gửi đi
+                to: result.email, // email nhận
+                subject: "Đăng ký thành công", //subject
+                text: "Cảm ơn bạn đã đăng ký", // nội dung mail
+            }; // Nếu thêm thành công result !null trả về dữ liệu
+        await Transporter.sendMail(mailOptions); // gửi mail
+        res.json({
+            "status" : 200,
+            "messenger" : "Thêm thành công",
+            "data" : result
+        })
+        } else {// Nếu thêm không thành công result null, thông báo không thành công
+        res.json({
+            "status" : 400 ,
+            "messenger" : "Lỗi, thêm không thành công",
+            "data" : []
+        })}
+    } catch (error) {
+        console.log(error)
     }
 })
 
